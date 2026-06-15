@@ -13,6 +13,10 @@ let package = Package(
     .executableTarget(
       name: "host",
       resources: [.copy("bingo.arm64.img")]
+    ),
+    .testTarget(
+      name: "hostTests",
+      dependencies: ["host"]
     )
   ],
   swiftLanguageModes: [.v6]

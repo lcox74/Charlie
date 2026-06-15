@@ -32,7 +32,10 @@ final class Runner: NSObject, ObservableObject, VZVirtualMachineDelegate {
   private var restartRequested = false
   private var logCounter = 0
 
-  private static let ipPattern = try! Regex(#"ip=(\d{1,3}(?:\.\d{1,3}){3})"#)
+  // Compiled once and only ever read, so unsafe-nonisolated access is fine.
+  // It's only like this to test with it.
+  nonisolated(unsafe) private static let ipPattern = try! Regex(#"ip=(\d{1,3}(?:\.\d{1,3}){3})"#)
+
   private static let maxLogLines = 5000
   private static var signalSources: [DispatchSourceSignal] = []
 
@@ -178,13 +181,23 @@ final class Runner: NSObject, ObservableObject, VZVirtualMachineDelegate {
   private func onConsoleLine(_ line: String) {
     log(line, .guest)
 
-    if guestIP == nil,
-      let match = line.firstMatch(of: Self.ipPattern),
-      let captured = match[1].substring
-    {
-      guestIP = String(captured)
-      log("guest IP \(guestIP!)", .host)
+    if guestIP == nil, let ip = Self.parseGuestIP(from: line) {
+      guestIP = ip
+      log("guest IP \(ip)", .host)
     }
+  }
+
+  // Extracts the `ip=<dotted-quad>` value the guest prints on its console, or
+  // nil if the line carries no IP
+  nonisolated static func parseGuestIP(from line: String) -> String? {
+    guard
+      let match = line.firstMatch(of: ipPattern),
+      let captured = match[1].substring
+    else {
+      return nil
+    }
+
+    return String(captured)
   }
 
   // Tears down VM-owned resources without changing run state.
