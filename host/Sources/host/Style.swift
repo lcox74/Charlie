@@ -16,9 +16,5 @@ enum ANSI {
   }
 
   static func bold(_ s: String) -> String { wrap(s, "1") }
-  static func dim(_ s: String) -> String { wrap(s, "2") }
-
-  static func yellow(_ s: String) -> String { wrap(s, "33") }
   static func blue(_ s: String) -> String { wrap(s, "34") }
-  static func cyan(_ s: String) -> String { wrap(s, "36") }
 }

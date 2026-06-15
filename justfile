@@ -31,18 +31,29 @@ build target="debug": guest-build
     bin="$({{swift}} build "${config[@]}" --package-path host --show-bin-path)/host"
     codesign --force --sign - --entitlements host/host.entitlements "$bin"
 
-# Run the host app (debug or release).
-[doc('Build, codesign, and run the host app (debug or release)')]
-run target="debug": (build target)
+# Run the host app (debug or release). Extra args are forwarded to the binary,
+# e.g. `just run --headless` or `just run release --headless` to run the CLI.
+[doc('Build, codesign, and run the host app (debug or release); extra args forwarded (e.g. --headless)')]
+run target="debug" *args="": (build (if target =~ '^--' { "debug" } else { target }))
     #!/usr/bin/env bash
     set -eo pipefail
 
+    target="{{target}}"
+    args="{{args}}"
+
+    # A leading flag (e.g. --headless) means no target was given; assume debug
+    # and forward the flag to the binary.
+    if [[ "$target" == --* ]]; then
+      args="$target $args"
+      target="debug"
+    fi
+
     config=()
-    if [ "{{target}}" = "release" ]; then config=(-c release); fi
+    if [ "$target" = "release" ]; then config=(-c release); fi
 
     bin="$({{swift}} build "${config[@]}" --package-path host --show-bin-path)/host"
 
-    exec "$bin"
+    exec "$bin" $args
 
 
 # Run the host test suite.
