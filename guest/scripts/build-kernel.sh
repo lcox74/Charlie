@@ -13,8 +13,7 @@
 #   /configs           bind mount of repo's kernel/ directory
 #
 # Output:
-#   /out/boot/vmlinuz  arch-appropriate kernel image (bzImage on amd64,
-#                      vmlinuz.efi on arm64)
+#   /out/boot/vmlinuz  the arm64 kernel image (vmlinuz.efi)
 #
 set -euo pipefail
 
@@ -23,8 +22,11 @@ set -euo pipefail
 : "${KERNEL_SHA256:?ERROR: KERNEL_SHA256 is not set}"
 
 # Validate config files exist
-for cfg in /configs/config.common /configs/config.amd64 /configs/config.arm64; do
-    [[ -f "${cfg}" ]] || { echo "ERROR: missing ${cfg}" >&2; exit 1; }
+for cfg in /configs/config.common /configs/config.arm64; do
+    [[ -f "${cfg}" ]] || {
+        echo "ERROR: missing ${cfg}" >&2
+        exit 1
+    }
 done
 
 cd /kbuild
@@ -44,26 +46,16 @@ cd "linux-${KERNEL_VERSION}"
 export KBUILD_BUILD_USER=bingo KBUILD_BUILD_HOST=docker
 
 ARCH="$(uname -m)"
-case "${ARCH}" in
-    x86_64)
-        ARCH_FRAG=/configs/config.amd64
-        MAKE_TARGET=bzImage
-        KERNEL_OUT=arch/x86/boot/bzImage
-        make CC="ccache gcc" HOSTCC="ccache gcc" defconfig
-        ;;
-    aarch64)
-        ARCH_FRAG=/configs/config.arm64
-        MAKE_TARGET=vmlinuz.efi
-        KERNEL_OUT=arch/arm64/boot/vmlinuz.efi
-        cp /configs/config.arm64.seed .config
-        ;;
-    *)
-        echo "ERROR: unsupported arch ${ARCH}" >&2
-        exit 1
-        ;;
-esac
+if [[ "${ARCH}" != "aarch64" ]]; then
+    echo "ERROR: unsupported arch ${ARCH} (arm64/aarch64 only)" >&2
+    exit 1
+fi
 
-scripts/kconfig/merge_config.sh -m .config /configs/config.common "${ARCH_FRAG}"
+MAKE_TARGET=vmlinuz.efi
+KERNEL_OUT=arch/arm64/boot/vmlinuz.efi
+cp /configs/config.arm64.seed .config
+
+scripts/kconfig/merge_config.sh -m .config /configs/config.common /configs/config.arm64
 make CC="ccache gcc" HOSTCC="ccache gcc" olddefconfig
 make -j"$(nproc)" CC="ccache gcc" HOSTCC="ccache gcc" "${MAKE_TARGET}"
 

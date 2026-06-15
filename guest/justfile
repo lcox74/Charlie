@@ -15,37 +15,25 @@ check-docker:
     @command -v docker >/dev/null 2>&1 || { echo "ERROR: docker is not installed." >&2; exit 1; }
 
 [private]
-check-qemu arch:
-    #!/usr/bin/env bash
-    case "{{arch}}" in
-        arm64) qemu="qemu-system-aarch64" ;;
-        amd64) qemu="qemu-system-x86_64" ;;
-        *) echo "ERROR: unsupported arch '{{arch}}'." >&2; exit 1 ;;
-    esac
-    command -v "$qemu" >/dev/null 2>&1 || { echo "ERROR: $qemu is not installed." >&2; exit 1; }
+check-qemu:
+    @command -v qemu-system-aarch64 >/dev/null 2>&1 || { echo "ERROR: qemu-system-aarch64 is not installed." >&2; exit 1; }
 
 [private]
 check-lint:
     @command -v golangci-lint >/dev/null 2>&1 || { echo "ERROR: golangci-lint is not installed." >&2; exit 1; }
 
-# Build artifact: just build [arch=amd64] [format=uefi]
+# Build the arm64 UEFI disk image: just build
 [group('build')]
-build arch="amd64" format="uefi": check-docker
+build: check-docker
     #!/usr/bin/env bash
     set -euo pipefail
 
-    ext={{ if format == "uefi" { "img" } else { "iso" } }}
-    artifact="{{output_dir}}/bingo.{{arch}}.${ext}"
-
-    if [[ "{{format}}" == "legacy" && "{{arch}}" != "amd64" ]]; then
-        echo "ERROR: format=legacy is amd64 only (SeaBIOS is x86 firmware)." >&2
-        exit 1
-    fi
+    artifact="{{output_dir}}/bingo.arm64.img"
 
     mkdir -p {{output_dir}}
     docker build \
-        --platform "linux/{{arch}}" \
-        --target "export-${ext}" \
+        --platform linux/arm64 \
+        --target export-img \
         --output "type=local,dest={{output_dir}}" \
         --build-arg KERNEL_VERSION={{kernel_version}} \
         --build-arg KERNEL_SHA256={{kernel_sha256}} \
@@ -58,54 +46,24 @@ build arch="amd64" format="uefi": check-docker
         exit 1
     fi
 
-# Run with QEMU: just run [arch=amd64] [format=uefi]
+# Build then boot the arm64 image in QEMU: just run
 [group('run')]
-run arch="amd64" format="uefi": (check-qemu arch) (build arch format)
+run: check-qemu build
     #!/usr/bin/env bash
     set -euo pipefail
 
-    ext={{ if format == "uefi" { "img" } else { "iso" } }}
-    artifact="{{output_dir}}/bingo.{{arch}}.${ext}"
+    artifact="{{output_dir}}/bingo.arm64.img"
 
-    case "{{format}}:{{arch}}" in
-        uefi:arm64)
-            cp /opt/homebrew/share/qemu/edk2-arm-vars.fd {{efi_vars_tmp}}
-            exec qemu-system-aarch64 \
-                -machine virt -accel hvf -cpu host \
-                -m 256 \
-                -drive if=pflash,format=raw,readonly=on,file=/opt/homebrew/share/qemu/edk2-aarch64-code.fd \
-                -drive if=pflash,format=raw,file={{efi_vars_tmp}} \
-                -drive if=virtio,file="${artifact}",format=raw \
-                -netdev user,id=net0,hostfwd=tcp::8080-:8080 \
-                -device virtio-net-pci,netdev=net0 \
-                -nographic
-            ;;
-        uefi:amd64)
-            cp /opt/homebrew/share/qemu/edk2-i386-vars.fd {{efi_vars_tmp}}
-            exec qemu-system-x86_64 \
-                -machine q35 -accel tcg -cpu qemu64 \
-                -m 256 \
-                -drive if=pflash,format=raw,readonly=on,file=/opt/homebrew/share/qemu/edk2-x86_64-code.fd \
-                -drive if=pflash,format=raw,file={{efi_vars_tmp}} \
-                -drive if=virtio,file="${artifact}",format=raw \
-                -netdev user,id=net0,hostfwd=tcp::8080-:8080 \
-                -device virtio-net-pci,netdev=net0 \
-                -nographic
-            ;;
-        legacy:amd64)
-            exec qemu-system-x86_64 \
-                -machine pc -accel tcg -cpu qemu64 \
-                -m 256 \
-                -cdrom "${artifact}" \
-                -netdev user,id=net0,hostfwd=tcp::8080-:8080 \
-                -device virtio-net-pci,netdev=net0 \
-                -nographic
-            ;;
-        legacy:*)
-            echo "ERROR: format=legacy is amd64 only." >&2
-            exit 1
-            ;;
-    esac
+    cp /opt/homebrew/share/qemu/edk2-arm-vars.fd {{efi_vars_tmp}}
+    exec qemu-system-aarch64 \
+        -machine virt -accel hvf -cpu host \
+        -m 256 \
+        -drive if=pflash,format=raw,readonly=on,file=/opt/homebrew/share/qemu/edk2-aarch64-code.fd \
+        -drive if=pflash,format=raw,file={{efi_vars_tmp}} \
+        -drive if=virtio,file="${artifact}",format=raw \
+        -netdev user,id=net0,hostfwd=tcp::8080-:8080 \
+        -device virtio-net-pci,netdev=net0 \
+        -nographic
 
 # Run linter on Go code
 [group('dev')]
@@ -119,7 +77,7 @@ clean: check-docker
     #!/usr/bin/env bash
     set -eu
     rm -rf {{output_dir}}
-    docker image rm -f bingo-builder-amd64 bingo-builder-arm64 >/dev/null 2>&1 || true
+    docker image rm -f bingo-builder-arm64 >/dev/null 2>&1 || true
     docker buildx prune -f \
         --filter "type=exec.cachemount" \
         --filter "description~=bingo-"

@@ -42,8 +42,6 @@ RUN --mount=type=cache,target=/kbuild,sharing=locked,id=bingo-kbuild-${TARGETARC
 # Stage 3: Build the Unified Kernel Image.
 FROM debian:trixie-slim AS ukibuilder
 
-ARG TARGETARCH
-
 RUN apt-get update -qq && \
     apt-get install -y --no-install-recommends \
         systemd-boot-efi systemd-ukify binutils xz-utils cpio && \
@@ -77,28 +75,4 @@ ARG TARGETARCH
 
 COPY --from=imgbuilder /out/bingo.${TARGETARCH}.img /
 ENTRYPOINT ["/bingo.${TARGETARCH}.img"]
-
-# Stage 5: Assemble the ISO
-FROM alpine:3.23 AS isobuilder
-
-ARG TARGETARCH
-
-RUN apk add --no-cache bash xorriso syslinux xz cpio coreutils sed
-
-COPY --from=kbuilder  /out/boot/vmlinuz /iso/vmlinuz
-COPY --from=gobuilder /bingo-init   /iso/init-bin
-COPY kernel/cmdline                     /iso/cmdline
-COPY scripts/init-mkinitramfs.sh        /iso/mk.sh
-COPY scripts/assemble-iso.sh            /iso/assemble-iso.sh
-
-RUN /iso/mk.sh /iso
-RUN /iso/assemble-iso.sh /iso /out/bingo.${TARGETARCH}.iso
-
-# Stage 5b: Export ISO
-FROM scratch AS export-iso
-
-ARG TARGETARCH
-
-COPY --from=isobuilder /out/bingo.${TARGETARCH}.iso /
-ENTRYPOINT ["/bingo.${TARGETARCH}.iso"]
 

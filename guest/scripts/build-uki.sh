@@ -2,10 +2,7 @@
 #
 # build-uki.sh: packs kernel + initramfs + cmdline into a Unified
 # Kernel Image - a single PE binary that UEFI firmware loads directly
-# from /EFI/BOOT/BOOT{X64,AA64}.EFI. Runs inside the ukibuilder stage.
-#
-# Inputs (env vars):
-#   TARGETARCH       amd64 or arm64; selects the serial console
+# from /EFI/BOOT/BOOTAA64.EFI. Runs inside the ukibuilder stage.
 #
 # Input files:
 #   /uki/vmlinuz        kernel
@@ -17,22 +14,18 @@
 #
 set -euo pipefail
 
-# Validate required environment variable
-: "${TARGETARCH:?ERROR: TARGETARCH is not set}"
-
 # Validate input files exist
 for f in /uki/vmlinuz /uki/initramfs.img /uki/cmdline; do
-    [[ -f "${f}" ]] || { echo "ERROR: missing ${f}" >&2; exit 1; }
+    [[ -f "${f}" ]] || {
+        echo "ERROR: missing ${f}" >&2
+        exit 1
+    }
 done
 
-case "${TARGETARCH}" in
-    amd64) CONSOLE=ttyS0 ;;
-    arm64) CONSOLE=ttyAMA0 ;;
-    *)
-        echo "unsupported arch ${TARGETARCH}" >&2
-        exit 1
-        ;;
-esac
+# arm64 QEMU virt exposes a PL011 UART as ttyAMA0. Under Apple's
+# Virtualization.framework the guest instead gets a virtio-console (hvc0),
+# which the cmdline template appends directly.
+CONSOLE=ttyAMA0
 
 CMDLINE="$(sed "s|\${CONSOLE}|${CONSOLE}|g" /uki/cmdline)"
 
@@ -41,4 +34,3 @@ ukify build \
     --initrd=/uki/initramfs.img \
     --cmdline="${CMDLINE}" \
     --output=/uki/BOOT.EFI
-

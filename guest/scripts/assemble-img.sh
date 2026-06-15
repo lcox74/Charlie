@@ -2,7 +2,7 @@
 #
 # assemble-img.sh: produces a minimal bootable disk image. Takes a
 # Unified Kernel Image (UKI) and emits a GPT+FAT disk with a single
-# file on the ESP at /EFI/BOOT/BOOT{X64,AA64}.EFI. UEFI firmware
+# file on the ESP at /EFI/BOOT/BOOTAA64.EFI. UEFI firmware
 # loads that file directly; there is no separate bootloader, kernel,
 # or initramfs on the ESP.
 #
@@ -14,13 +14,16 @@ UKI="${1:?usage: $0 <uki-path> <output-img>}"
 OUT="${2:?usage: $0 <uki-path> <output-img>}"
 
 # Validate input file exists
-[[ -f "${UKI}" ]] || { echo "ERROR: UKI file not found: ${UKI}" >&2; exit 1; }
+[[ -f "${UKI}" ]] || {
+    echo "ERROR: UKI file not found: ${UKI}" >&2
+    exit 1
+}
 
-case "$(uname -m)" in
-    x86_64)  efi_binary=BOOTX64.EFI ;;
-    aarch64) efi_binary=BOOTAA64.EFI ;;
-    *) echo "ERROR: unsupported arch $(uname -m)" >&2; exit 1 ;;
-esac
+if [[ "$(uname -m)" != "aarch64" ]]; then
+    echo "ERROR: unsupported arch $(uname -m) (arm64/aarch64 only)" >&2
+    exit 1
+fi
+efi_binary=BOOTAA64.EFI
 
 uki_kb=$(du -k "${UKI}" | cut -f1)
 # +2 MB slack covers FAT metadata; +1 MB covers GPT + 1 MiB partition
@@ -43,7 +46,7 @@ truncate -s "${esp_size_mb}M" "${esp_img}"
 mkfs.fat -n ESP "${esp_img}"
 
 export MTOOLS_SKIP_CHECK=1
-mmd   -i "${esp_img}" ::/EFI ::/EFI/BOOT
+mmd -i "${esp_img}" ::/EFI ::/EFI/BOOT
 mcopy -i "${esp_img}" "${UKI}" "::/EFI/BOOT/${efi_binary}"
 
 # Partition 1 starts at 1 MiB per `parted ... 1MiB 100%`.
