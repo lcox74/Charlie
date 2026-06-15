@@ -4,24 +4,16 @@
 import PackageDescription
 
 let package = Package(
-    name: "host",
-    products: [
-        // Products define the executables and libraries a package produces, making them visible to other packages.
-        .library(
-            name: "host",
-            targets: ["host"]
-        ),
-    ],
-    targets: [
-        // Targets are the basic building blocks of a package, defining a module or a test suite.
-        // Targets can depend on other targets in this package and products from dependencies.
-        .target(
-            name: "host"
-        ),
-        .testTarget(
-            name: "hostTests",
-            dependencies: ["host"]
-        ),
-    ],
-    swiftLanguageModes: [.v6]
+  name: "host",
+  platforms: [.macOS(.v26)],
+  products: [
+    .executable(name: "host", targets: ["host"])
+  ],
+  targets: [
+    .executableTarget(
+      name: "host",
+      resources: [.copy("bingo.arm64.img")]
+    )
+  ],
+  swiftLanguageModes: [.v6]
 )

@@ -46,6 +46,18 @@ CONFIG_VIRTIO_MMIO=y
 CONFIG_VIRTIO_NET=y
 CONFIG_VIRTIO_BLK=y
 
+# --- Virtio console (hvc0) ---
+# Apple's Virtualization.framework exposes a virtio-console serial port
+# (hvc0), not a PL011/16550 UART, so this is how kernel + PID 1 output is
+# surfaced under VZ. Harmless on qemu-virt, which keeps using ttyAMA0.
+CONFIG_VIRTIO_CONSOLE=y
+
+# --- vsock: host <-> guest sockets over virtio ---
+# Seeds the channel for direct IPC between the Swift host app and the Go
+# init. The AF_VSOCK listener and wire protocol are still to come.
+CONFIG_VSOCKETS=y
+CONFIG_VIRTIO_VSOCKETS=y
+
 # --- PCI (required by virtio-pci) ---
 CONFIG_PCI=y
 CONFIG_PCI_MSI=y

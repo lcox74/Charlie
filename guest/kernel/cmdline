@@ -1,2 +1,2 @@
-console=tty0 console=${CONSOLE} random.trust_cpu=on
+console=tty0 console=${CONSOLE} console=hvc0 random.trust_cpu=on
 
