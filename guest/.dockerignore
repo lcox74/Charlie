@@ -1,0 +1,23 @@
+# Git
+.git/
+.gitignore
+
+# Build output
+out/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Documentation
+*.md
+LICENSE
+
+# OS
+.DS_Store
+
+# Environment
+.env
+.env.local

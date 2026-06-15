@@ -1,0 +1,125 @@
+# Configuration
+output_dir := "out"
+efi_vars_tmp := "/tmp/bingo-vars.fd"
+kernel_version := "6.12.81"
+kernel_sha256 := "c2b09c3643946a7097c5371e1dcb123c66505ea30fafd0b0a22dc1d5f0228847"
+
+# List available recipes
+[default]
+list:
+    @just --list --unsorted
+
+# Dependency checks
+[private]
+check-docker:
+    @command -v docker >/dev/null 2>&1 || { echo "ERROR: docker is not installed." >&2; exit 1; }
+
+[private]
+check-qemu arch:
+    #!/usr/bin/env bash
+    case "{{arch}}" in
+        arm64) qemu="qemu-system-aarch64" ;;
+        amd64) qemu="qemu-system-x86_64" ;;
+        *) echo "ERROR: unsupported arch '{{arch}}'." >&2; exit 1 ;;
+    esac
+    command -v "$qemu" >/dev/null 2>&1 || { echo "ERROR: $qemu is not installed." >&2; exit 1; }
+
+[private]
+check-lint:
+    @command -v golangci-lint >/dev/null 2>&1 || { echo "ERROR: golangci-lint is not installed." >&2; exit 1; }
+
+# Build artifact: just build [arch=amd64] [format=uefi]
+[group('build')]
+build arch="amd64" format="uefi": check-docker
+    #!/usr/bin/env bash
+    set -euo pipefail
+
+    ext={{ if format == "uefi" { "img" } else { "iso" } }}
+    artifact="{{output_dir}}/bingo.{{arch}}.${ext}"
+
+    if [[ "{{format}}" == "legacy" && "{{arch}}" != "amd64" ]]; then
+        echo "ERROR: format=legacy is amd64 only (SeaBIOS is x86 firmware)." >&2
+        exit 1
+    fi
+
+    mkdir -p {{output_dir}}
+    docker build \
+        --platform "linux/{{arch}}" \
+        --target "export-${ext}" \
+        --output "type=local,dest={{output_dir}}" \
+        --build-arg KERNEL_VERSION={{kernel_version}} \
+        --build-arg KERNEL_SHA256={{kernel_sha256}} \
+        .
+
+    if [[ -f "${artifact}" ]]; then
+        echo "SUCCESS: ${artifact} ($(du -h "${artifact}" | cut -f1))"
+    else
+        echo "ERROR: build failed, no artifact produced." >&2
+        exit 1
+    fi
+
+# Run with QEMU: just run [arch=amd64] [format=uefi]
+[group('run')]
+run arch="amd64" format="uefi": (check-qemu arch) (build arch format)
+    #!/usr/bin/env bash
+    set -euo pipefail
+
+    ext={{ if format == "uefi" { "img" } else { "iso" } }}
+    artifact="{{output_dir}}/bingo.{{arch}}.${ext}"
+
+    case "{{format}}:{{arch}}" in
+        uefi:arm64)
+            cp /opt/homebrew/share/qemu/edk2-arm-vars.fd {{efi_vars_tmp}}
+            exec qemu-system-aarch64 \
+                -machine virt -accel hvf -cpu host \
+                -m 256 \
+                -drive if=pflash,format=raw,readonly=on,file=/opt/homebrew/share/qemu/edk2-aarch64-code.fd \
+                -drive if=pflash,format=raw,file={{efi_vars_tmp}} \
+                -drive if=virtio,file="${artifact}",format=raw \
+                -netdev user,id=net0,hostfwd=tcp::8080-:8080 \
+                -device virtio-net-pci,netdev=net0 \
+                -nographic
+            ;;
+        uefi:amd64)
+            cp /opt/homebrew/share/qemu/edk2-i386-vars.fd {{efi_vars_tmp}}
+            exec qemu-system-x86_64 \
+                -machine q35 -accel tcg -cpu qemu64 \
+                -m 256 \
+                -drive if=pflash,format=raw,readonly=on,file=/opt/homebrew/share/qemu/edk2-x86_64-code.fd \
+                -drive if=pflash,format=raw,file={{efi_vars_tmp}} \
+                -drive if=virtio,file="${artifact}",format=raw \
+                -netdev user,id=net0,hostfwd=tcp::8080-:8080 \
+                -device virtio-net-pci,netdev=net0 \
+                -nographic
+            ;;
+        legacy:amd64)
+            exec qemu-system-x86_64 \
+                -machine pc -accel tcg -cpu qemu64 \
+                -m 256 \
+                -cdrom "${artifact}" \
+                -netdev user,id=net0,hostfwd=tcp::8080-:8080 \
+                -device virtio-net-pci,netdev=net0 \
+                -nographic
+            ;;
+        legacy:*)
+            echo "ERROR: format=legacy is amd64 only." >&2
+            exit 1
+            ;;
+    esac
+
+# Run linter on Go code
+[group('dev')]
+lint: check-lint
+    cd src && GOOS=linux golangci-lint run --config .golangci.yml ./...
+
+# Remove build outputs and Docker caches
+[group('dev')]
+[confirm("Delete all build artifacts and Docker caches?")]
+clean: check-docker
+    #!/usr/bin/env bash
+    set -eu
+    rm -rf {{output_dir}}
+    docker image rm -f bingo-builder-amd64 bingo-builder-arm64 >/dev/null 2>&1 || true
+    docker buildx prune -f \
+        --filter "type=exec.cachemount" \
+        --filter "description~=bingo-"

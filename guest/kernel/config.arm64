@@ -1,0 +1,32 @@
+# bingo kernel config fragment: arm64 additions.
+# Merged on top of config.arm64.seed + config.common.
+
+# --- PL011 serial for ttyAMA0 on qemu-virt ---
+CONFIG_SERIAL_AMBA_PL011=y
+CONFIG_SERIAL_AMBA_PL011_CONSOLE=y
+CONFIG_SERIAL_EARLYCON=y
+
+# --- Generic PCI host controller (qemu-virt) ---
+CONFIG_PCI_HOST_GENERIC=y
+
+# --- Interrupt controllers ---
+CONFIG_ARM_GIC=y
+CONFIG_ARM_GIC_V3=y
+
+# --- Architected timer and PSCI (boot / cpu bring-up) ---
+CONFIG_ARM_ARCH_TIMER=y
+CONFIG_ARM_PSCI=y
+
+# --- ACPI is mandatory on this target: QEMU -machine virt with edk2
+# --- firmware hands the kernel ACPI tables (incl. SPCR for serial
+# --- console), NOT a device tree. Disabling ACPI causes the kernel to
+# --- boot silently (no PL011 discovery) and die before printk works.
+CONFIG_ACPI=y
+
+# --- EFI zboot: produces arch/arm64/boot/vmlinuz.efi, a self-extracting
+# --- compressed EFI PE binary. LZMA is ~15-20% smaller than ZSTD for
+# --- kernel-sized payloads; we trade a few hundred ms of boot decode
+# --- time for size, which is the right call here.
+CONFIG_EFI_ZBOOT=y
+CONFIG_EFI_ZBOOT_COMPRESSION_LZMA=y
+

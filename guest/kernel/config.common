@@ -1,0 +1,59 @@
+# bingo kernel config fragment: common to both arches.
+# Merged onto the arch defconfig by scripts/kconfig/merge_config.sh.
+
+# --- EXPERT unlocks disabling of symbols that are otherwise forced to y
+# --- by the Kconfig "default y" clauses on non-EXPERT builds (INPUT,
+# --- HID, MEDIA_SUPPORT, etc. all fall under this).
+CONFIG_EXPERT=y
+
+# --- Size optimizations: -Os, tiny SLUB allocator, minimal CPU count.
+# --- arm64 hard-requires NR_CPUS >= 2 under SMP, so 2 is the floor.
+CONFIG_CC_OPTIMIZE_FOR_SIZE=y
+CONFIG_SLUB_TINY=y
+CONFIG_NR_CPUS=2
+
+# --- No 32-bit compat syscall tables (our userspace is 64-bit). ---
+# CONFIG_COMPAT is not set
+
+# --- Initramfs and root ---
+CONFIG_BLK_DEV_INITRD=y
+CONFIG_RD_XZ=y
+
+# --- EFI boot stub ---
+CONFIG_EFI=y
+CONFIG_EFI_STUB=y
+
+# --- Filesystems we actually mount ---
+CONFIG_PROC_FS=y
+CONFIG_SYSFS=y
+CONFIG_TMPFS=y
+CONFIG_DEVTMPFS=y
+CONFIG_UNIX98_PTYS=y
+CONFIG_TTY=y
+
+# --- Networking core ---
+CONFIG_NET=y
+CONFIG_INET=y
+CONFIG_IPV6=y
+CONFIG_UNIX=y
+CONFIG_PACKET=y
+
+# --- Virtio core + net (built in) ---
+CONFIG_VIRTIO_MENU=y
+CONFIG_VIRTIO=y
+CONFIG_VIRTIO_PCI=y
+CONFIG_VIRTIO_MMIO=y
+CONFIG_VIRTIO_NET=y
+CONFIG_VIRTIO_BLK=y
+
+# --- PCI (required by virtio-pci) ---
+CONFIG_PCI=y
+CONFIG_PCI_MSI=y
+
+# --- Entropy: virtio-rng + CPU RNG trust ---
+CONFIG_RANDOM_TRUST_CPU=y
+CONFIG_HW_RANDOM=y
+CONFIG_HW_RANDOM_VIRTIO=y
+
+# --- Keep printk for bring-up ---
+CONFIG_PRINTK=y

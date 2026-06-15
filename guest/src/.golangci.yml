@@ -1,0 +1,153 @@
+version: "2"
+
+run:
+  timeout: 5m
+  relative-path-mode: gomod
+
+output:
+  formats:
+    text:
+      colors: true
+  show-stats: true
+
+linters:
+  default: standard
+
+  enable:
+    - errorlint
+    - nilerr
+    - nilnesserr
+    - forcetypeassert
+    - contextcheck
+    - makezero
+    - predeclared
+    - reassign
+    - fatcontext
+    - gosec
+    - nosprintfhostport
+    - mirror
+    - recvcheck
+    - modernize
+    - intrange
+    - copyloopvar
+    - perfsprint
+    - prealloc
+    - unconvert
+    - nakedret
+    - unparam
+    - wastedassign
+    - errname
+    - paralleltest
+    - thelper
+    - revive
+    - whitespace
+    - gocritic
+    - errchkjson
+
+  settings:
+    govet:
+      enable:
+        - waitgroup
+        - hostport
+
+    errcheck:
+      check-type-assertions: true
+      check-blank: true
+      exclude-functions:
+        - (*os.File).Close
+        - (*os.File).SetReadDeadline
+        - (net.Conn).Close
+        - (net.Conn).SetReadDeadline
+
+    errorlint:
+      errorf: true
+      errorf-multi: true
+      asserts: true
+      comparison: true
+
+    gosec:
+      excludes:
+        # G104: unhandled errors for Close/SetReadDeadline
+        - G104
+        # G304: file path as taint input — paths are validated via os.Root which prevents traversal
+        - G304
+        # G306: weak file permissions — log files are intentionally 0644 so they can be inspected without root
+        - G306
+
+    gocritic:
+      enabled-tags:
+        - diagnostic
+        - performance
+        - style
+      disabled-checks:
+        - commentedOutCode
+        - hugeParam
+
+    revive:
+      rules:
+        - name: exported
+          arguments:
+            - disableStutteringCheck
+        - name: unused-parameter
+          arguments:
+            - allowRegex: "^_"
+        - name: error-return
+        - name: error-strings
+        - name: error-naming
+        - name: if-return
+        - name: increment-decrement
+        - name: var-declaration
+        - name: range
+        - name: receiver-naming
+        - name: unexported-return
+        - name: indent-error-flow
+        - name: blank-imports
+        - name: context-as-argument
+        - name: context-keys-type
+        - name: dot-imports
+        - name: empty-block
+        - name: superfluous-else
+
+    nakedret:
+      max-func-lines: 0
+
+    prealloc:
+      simple: true
+      range-loops: true
+      for-loops: true
+
+    perfsprint:
+      strconcat: true
+
+  exclusions:
+    presets:
+      - common-false-positives
+
+    warn-unused: true
+
+    rules:
+      - path: "_test\\.go$"
+        linters:
+          - gosec
+          - forcetypeassert
+          - unparam
+          - errcheck
+
+formatters:
+  enable:
+    - gofmt
+    - goimports
+
+issues:
+  max-issues-per-linter: 0
+  max-same-issues: 0
+
+severity:
+  default: error
+  rules:
+    - linters:
+        - whitespace
+        - modernize
+        - perfsprint
+        - prealloc
+      severity: warning
