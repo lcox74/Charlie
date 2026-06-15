@@ -23,6 +23,19 @@ CONFIG_ARM_PSCI=y
 # --- boot silently (no PL011 discovery) and die before printk works.
 CONFIG_ACPI=y
 
+# --- ACPI control-method power button (PNP0C0C). Default-y; kept explicit. ---
+CONFIG_ACPI_BUTTON=y
+
+# --- Power button delivery. On this platform (QEMU virt / Apple Virtualization
+# --- arm64 ACPI) the power button is signalled on a PL061 GPIO line (ACPI HID
+# --- ARMH0061) whose ACPI GpioInt event method Notify()s the power button
+# --- device. Without the PL061 driver and ACPI GPIO event support the line is
+# --- undriven, so a host power-off request (VZ requestStop) never reaches the
+# --- button device or userspace.
+CONFIG_GPIOLIB=y
+CONFIG_GPIOLIB_ACPI=y
+CONFIG_GPIO_PL061=y
+
 # --- EFI zboot: produces arch/arm64/boot/vmlinuz.efi, a self-extracting
 # --- compressed EFI PE binary. LZMA is ~15-20% smaller than ZSTD for
 # --- kernel-sized payloads; we trade a few hundred ms of boot decode
