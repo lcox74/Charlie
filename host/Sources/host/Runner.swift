@@ -114,7 +114,7 @@ final class Runner: NSObject, VZVirtualMachineDelegate {
 
   private static func supportDirectory() throws -> URL {
     let base = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
-    let dir = base.appendingPathComponent("castle", isDirectory: true)
+    let dir = base.appendingPathComponent("charlie", isDirectory: true)
 
     try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
 

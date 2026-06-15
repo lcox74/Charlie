@@ -8,22 +8,20 @@ default:
     @just --list
 
 
-# Build the guest disk image using Docker
+# Build the guest disk image and sync it into the host resources.
 [doc('Build the bingo guest image (arm64 uefi)')]
 guest-build:
-    cd guest && just build
-    cp out/bingo.arm64.img ../host/Sources/host/bingo.arm64.img
-
-# Build the host app (debug or release).
-[doc('Build the host app (debug or release)')]
-build target="debug":
     #!/usr/bin/env bash
     set -eo pipefail
 
     cd guest && just build
     cp out/bingo.arm64.img ../host/Sources/host/bingo.arm64.img
 
-    cd ..
+# Build the host app (debug or release).
+[doc('Build the host app (debug or release)')]
+build target="debug": guest-build
+    #!/usr/bin/env bash
+    set -eo pipefail
 
     config=()
     if [ "{{target}}" = "release" ]; then config=(-c release); fi
@@ -35,7 +33,7 @@ build target="debug":
 
 # Run the host app (debug or release).
 [doc('Build, codesign, and run the host app (debug or release)')]
-run target="debug": build
+run target="debug": (build target)
     #!/usr/bin/env bash
     set -eo pipefail
 
